@@ -1,0 +1,682 @@
+{
+  "name": "LinkedIn DM Outreach",
+  "nodes": [
+    {
+      "parameters": {
+        "url": "https://www.googleapis.com/customsearch/v1",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "key",
+              "value": "AIzaSyDlQLWDEnjOR5ywOiACYLDEQch6Ea378JM"
+            },
+            {
+              "name": "cx",
+              "value": "e0508ec5460f8443e"
+            },
+            {
+              "name": "q",
+              "value": "={{ $json.output }}\nsite:linkedin.com/in "
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {}
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        944,
+        240
+      ],
+      "id": "2f056e62-31af-4bf4-a336-4d105aced971",
+      "name": "Search Google"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get the response data\nconst response = $input.first().json;\nconst items = response.items || [];\n\n// Track pagination info\nlet nextStartIndex = 1;\nif (response.queries && response.queries.nextPage && response.queries.nextPage[0]) {\n  nextStartIndex = response.queries.nextPage[0].startIndex;\n}\n\n// Calculate if we should continue (Google only allows up to 100 results)\nconst hasMoreResults = nextStartIndex <= 100;\n\n// Process the items and include pagination info in each item\nconst results = items.map(item => {\n  const titleParts = item.title.split(\" - \");\n  return {\n    name: titleParts[0] || null,\n    title: titleParts.slice(1).join(\" - \") || null,\n    link: item.link || null,\n    snippet: item.snippet || null,\n    image: item.pagemap?.cse_thumbnail?.[0]?.src || null,\n    // Add pagination info to each item\n    startIndex: nextStartIndex,\n    hasMoreResults: hasMoreResults\n  };\n});\n\n// If there are no results, return at least one item with pagination info\nif (results.length === 0) {\n  return [{ \n    json: {\n      name: null,\n      title: null,\n      link: null,\n      snippet: null,\n      image: null,\n      startIndex: nextStartIndex,\n      hasMoreResults: false\n    }\n  }];\n}\n\n// Return the processed results\nreturn results.map(r => ({ json: r }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        240
+      ],
+      "id": "5ca75b80-af92-42d4-a1f9-fdbc5b842773",
+      "name": "Extract Results"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1YGaxHMLUkRmJ-Mf4RUIeTJM99FmrSlJ02WF19_71yy8",
+          "mode": "list",
+          "cachedResultName": "linkdin",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1YGaxHMLUkRmJ-Mf4RUIeTJM99FmrSlJ02WF19_71yy8/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1YGaxHMLUkRmJ-Mf4RUIeTJM99FmrSlJ02WF19_71yy8/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "name": "={{ $json.name }}",
+            "title": "={{ $json.title }}",
+            "link": "={{ $json.link }}",
+            "snippet": "={{ $json.snippet }}",
+            "status": "0"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "name",
+              "displayName": "name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "title",
+              "displayName": "title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "link",
+              "displayName": "link",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "snippet",
+              "displayName": "snippet",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1488,
+        240
+      ],
+      "id": "a0dff011-c873-41e1-95a8-498a15225bf3",
+      "name": "Add to Google",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "xuIFrX7KiWXvqjXv",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get all input items\nconst inputItems = $input.all();\nconsole.log(\"Input items count:\", inputItems.length);\n\n// Extract pagination values with fallbacks\nlet nextStartIndex = 1;\nlet hasMoreResults = false;\n\n// Try different approaches to find the pagination info\nif (inputItems && inputItems.length > 0) {\n  const firstItem = inputItems[0];\n  \n  // Check direct properties\n  if (firstItem.json) {\n    console.log(\"First item JSON:\", JSON.stringify(firstItem.json));\n    \n    // Check for \"index\" property (instead of startIndex)\n    if (firstItem.json.index !== undefined) {\n      nextStartIndex = firstItem.json.index;\n      console.log(\"Found index:\", nextStartIndex);\n    }\n    \n    // Check for \"results\" property (instead of hasMoreResults)\n    if (firstItem.json.results !== undefined) {\n      hasMoreResults = firstItem.json.results;\n      console.log(\"Found results:\", hasMoreResults);\n    }\n  }\n}\n\n// Return pagination control info\nreturn {\n  json: {\n    continueLoop: hasMoreResults,\n    startIndex: nextStartIndex\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1712,
+        240
+      ],
+      "id": "c36d4269-34ba-4498-83a9-a7c949c3ecb6",
+      "name": "Pagination"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "faef2862-80a4-465b-9e0b-be5b9753dcbd",
+              "leftValue": "={{ $json.continueLoop }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1920,
+        240
+      ],
+      "id": "0420a661-3db7-4100-b4e6-8a4a1a1b1167",
+      "name": "Pagination Check"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1296,
+        240
+      ],
+      "id": "37db4688-9136-4b5a-babe-39be7943fc5d",
+      "name": "Wait",
+      "webhookId": "d3bbbd53-2135-45e5-a847-aad35b1c518e"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "You are an AI agent that generates one random real-estate target profile for LinkedIn outreach.\nYour task is to randomly choose:\n\nOne role from the list below:\n\nReal Estate Agent\n\nReal Estate Broker\n\nReal Estate Consultant\n\nReal Estate Advisor\n\nProperty Consultant\n\nProperty Advisor\n\nReal Estate Sales\n\nChannel Partner\n\nBuilder\n\nDeveloper\n\nProperty Dealer\n\nReal Estate Investor\n\nReal Estate Marketing\n\nReal Estate Team Lead\n\nSales Manager – Real Estate\n\nOne region from the list below:\n\nMumbai, India\n\nDelhi NCR, India\n\nBengaluru, India\n\nHyderabad, India\n\nChennai, India\n\nPune, India\n\nKolkata, India\n\nSouth India (generic)\n\nDubai, UAE\n\nAbu Dhabi, UAE\n\nQatar\n\nSingapore\n\nMalaysia\n\nYour Output Format:\n\n\n  selected_role_here\n  selected_region_here\n",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [
+        832,
+        0
+      ],
+      "id": "a86b7574-6add-4b08-bd05-d5f3f623c39c",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {}
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        624,
+        0
+      ],
+      "id": "aa9c2b8f-126d-47e9-9dcc-0f1d5dfe9e05",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        704,
+        208
+      ],
+      "id": "cb83bb36-2d0b-4373-b10b-1d2b569fac3e",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "b43ZBzkPHuhgTziQ",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        1968,
+        0
+      ],
+      "id": "c96660ba-15fb-4949-ad3f-0e7428abe660",
+      "name": "Aggregate"
+    },
+    {
+      "parameters": {
+        "agentId": "5786341380650675",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.phantombuster",
+      "typeVersion": 1,
+      "position": [
+        2176,
+        0
+      ],
+      "id": "2e9566ed-707e-44aa-85e3-709635cc8c51",
+      "name": "Add an agent to the launch queue",
+      "credentials": {
+        "phantombusterApi": {
+          "id": "G1CtlMUICYaOHMEW",
+          "name": "Phantombuster account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "ccbd740e-944a-4619-80c3-403f27e21497",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "\"0\"",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1488,
+        16
+      ],
+      "id": "1c3b51b0-cb84-48e4-9b76-16fe70ea5cc1",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "1YGaxHMLUkRmJ-Mf4RUIeTJM99FmrSlJ02WF19_71yy8",
+          "mode": "list",
+          "cachedResultName": "linkdin",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1YGaxHMLUkRmJ-Mf4RUIeTJM99FmrSlJ02WF19_71yy8/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1YGaxHMLUkRmJ-Mf4RUIeTJM99FmrSlJ02WF19_71yy8/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "link": "={{ $json.link }}",
+            "name": "={{ $json.name }}",
+            "title": "={{ $json.title }}",
+            "snippet": "={{ $json.snippet }}",
+            "status": "1"
+          },
+          "matchingColumns": [
+            "link"
+          ],
+          "schema": [
+            {
+              "id": "name",
+              "displayName": "name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "title",
+              "displayName": "title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "link",
+              "displayName": "link",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "snippet",
+              "displayName": "snippet",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1744,
+        0
+      ],
+      "id": "89e112ec-527e-4ef9-98f7-f9b0fa79c969",
+      "name": "Append or update row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "xuIFrX7KiWXvqjXv",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "pinData": {
+    "Add to Google": [
+      {
+        "json": {
+          "name": "Shashi Kant Joshi",
+          "title": "Real Estate Consultant at mata rani Property ...",
+          "link": "https://in.linkedin.com/in/shashi-kant-joshi-53a4001bb",
+          "snippet": "Real Estate Consultant at mata rani Property Dealers. Property meri mata rani dealer University of Calcutta. Kolkata, West Bengal, India. 366 followers 257 ...",
+          "status": "0"
+        }
+      },
+      {
+        "json": {
+          "name": "Anu Jalan",
+          "title": "Top Real Estate Agent | Helping First-Time Buyers ...",
+          "link": "https://in.linkedin.com/in/property-guide",
+          "snippet": "Jalan Property Consultant. Jul 2017 - Present 8 years 5 months. Kolkata, West Bengal, India. During my ...",
+          "status": "0"
+        }
+      },
+      {
+        "json": {
+          "name": "Arun Kumar Shaw",
+          "title": "Branch Manager at Agrawal property dealer ...",
+          "link": "https://in.linkedin.com/in/arun-kumar-shaw-2b0250a4",
+          "snippet": "... property dealer · Education: Eiilm Univercity · Location: Kolkata · 444 connections on LinkedIn ... Kolkata, West Bengal, India. 442 followers 444 connections.",
+          "status": "0"
+        }
+      },
+      {
+        "json": {
+          "name": "Debasree Ghosh",
+          "title": "Assistant Manager - CRM at Tata Realty ...",
+          "link": "https://in.linkedin.com/in/debasree-ghosh-76814291",
+          "snippet": "Kolkata, West Bengal, India. 1K followers 500+ connections. See your ... Agrawal Property Dealer - India Graphic. Sales Coordinator. Agrawal Property ...",
+          "status": "0"
+        }
+      },
+      {
+        "json": {
+          "name": "SANJEEV MONDAL",
+          "title": "In House Dealer Trainer ( IDT ) at SPL KIA ...",
+          "link": "https://in.linkedin.com/in/sanjeev-mondal-aa8b82126",
+          "snippet": "In House Dealer Trainer ( IDT ). SPL KIA Motors (Sanwaria cars pvt ltd). Jun 2020 - Mar 2025 4 years 10 months. Kolkata, West Bengal, India ...",
+          "status": "0"
+        }
+      },
+      {
+        "json": {
+          "name": "Anil Yadav",
+          "title": "property dealer | LinkedIn",
+          "link": "https://in.linkedin.com/in/anil-yadav-8179157b",
+          "snippet": "Anil Yadav. property dealer. St.xaviers high school & Jr college. Mumbai, Maharashtra, India. 233 followers 232 connections. See your mutual connections. View ...",
+          "status": "0"
+        }
+      },
+      {
+        "json": {
+          "name": "pooran Choudhary",
+          "title": "Property Dealer ! Owner Shree Krishna ...",
+          "link": "https://in.linkedin.com/in/pooran-choudhary-a93a04190",
+          "snippet": "Nov 22, 2024 ... Property Dealer ! Owner Shree Krishna company · Experience: real estate · Education: Biyani Group Of Colleges - India · Location: Jaipur ...",
+          "status": "0"
+        }
+      },
+      {
+        "json": {
+          "name": "DEEPAK ASHOK ARORA",
+          "title": "CEO@Ashok Arora PropertyDealer ...",
+          "link": "https://in.linkedin.com/in/deepak-ashok-arora-49984677",
+          "snippet": "Ashok Arora Property Dealer - India Graphic. CEO. Ashok Arora Property Dealer - India. Oct 2005 - Present 20 years 2 months. delhi ncr. $TOGETHER WE CAN &WE ...",
+          "status": "0"
+        }
+      },
+      {
+        "json": {
+          "name": "Vishwanath Vyas",
+          "title": "Commercial Property Dealer",
+          "link": "https://in.linkedin.com/in/vishwanath-vyas",
+          "snippet": "Founder & CEO at RES Management - Commercial Property Dealer. RES Management - Commercial Property Dealer C. U. Shah Science College. Ahmedabad, Gujarat, India.",
+          "status": "0"
+        }
+      },
+      {
+        "json": {
+          "name": "Ram Nanda",
+          "title": "Property Consultant at Ram Nanda ji property dealer ...",
+          "link": "https://in.linkedin.com/in/ram-nanda-44092a14a",
+          "snippet": "Property Consultant at Ram Nanda ji property dealer. Ram Nanda ji property dealer. Washim, India. 11 followers 11 connections. See your mutual connections. View ...",
+          "status": "0"
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Search Google": {
+      "main": [
+        [
+          {
+            "node": "Extract Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Results": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add to Google": {
+      "main": [
+        [
+          {
+            "node": "Pagination",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pagination": {
+      "main": [
+        [
+          {
+            "node": "Pagination Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pagination Check": {
+      "main": [
+        [
+          {
+            "node": "Search Google",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Add to Google",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Search Google",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate": {
+      "main": [
+        [
+          {
+            "node": "Add an agent to the launch queue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Append or update row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Add an agent to the launch queue": {
+      "main": [
+        []
+      ]
+    },
+    "Append or update row in sheet": {
+      "main": [
+        [
+          {
+            "node": "Aggregate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "afa38346-e391-4e43-9046-f6e8bd1496ee",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "1a333288a609413540b314d40d8193d5c5cf8f543a4a46224e4d35fc91499084"
+  },
+  "id": "JWnt9PS0QAb84rn5",
+  "tags": [
+    {
+      "updatedAt": "2025-11-21T17:22:03.553Z",
+      "createdAt": "2025-11-21T17:22:03.553Z",
+      "id": "AVt4Ek2yZgK4qW6X",
+      "name": "youtube"
+    }
+  ]
+}
